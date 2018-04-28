@@ -1,0 +1,25 @@
+---
+title: "Analysis; The Spread of Fake News"
+author: "Pernille Berg Lassen"
+date: "28 apr 2018"
+output: html_document
+---
+
+Analyzing the spread of Fake News in a Social Network.
+
+Outline:
+  1. Short description of main questions and hypotheses 
+  2. Short description of network used to simulate the spread - it's structure, which parameters etc.
+  3. Data cleaning (Probably necessary)
+  4. Models used for analysis: Bayesian (brms or map2stan?)
+  5. Assessing model quality
+  6. Results (Pretty plots and some estimates)
+  
+
+1. Main Questions and Hyptheses 
+
+This paper set out to investigate how different network characteristics influence the spread of Fake News in a Social Network. Mainly, we are interested in which parameters must be present (and to what extent) to limit the spread of Fake News stories in a thightly interconnected network
+  We will explore this question from two different persepectives: 1) an 'assigned-Authority' perspective, where the modulators/modifiers (named 'WatchDogs') are randomly distributed throughtout the network, and have a fixed probability of detecting fake news*, and 2) a 'leave-it-to-the-population' perspective, where all agents/nodes within the network has a probability of detecting fake news, and afterwards punish the agent from which they received the Fake News by isolating it from the network (equavilent to ban someone from the Social Network platform).
+  In essense, these perspetives represent two different approaches to   .e. the network itself). 
+  This creates two different hypotheses:
+  1. 
