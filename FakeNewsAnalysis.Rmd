@@ -3,6 +3,8 @@ title: "Analysis; The Spread of Fake News"
 author: "Pernille Berg Lassen"
 date: "28 apr 2018"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 Analyzing the spread of Fake News in a Social Network.
@@ -23,17 +25,141 @@ This paper set out to investigate how different network characteristics influenc
   We will explore this question from two different persepectives: 1) an 'assigned-Authority' perspective, where the modulators/modifiers (named 'WatchDogs') are randomly distributed throughtout the network, and have a fixed probability of detecting fake news, and 2) a 'leave-it-to-the-population' perspective, where all agents/nodes within the network has a probability of detecting fake news, and afterwards punish the agent from which they received the Fake News by isolating it from the network (equavilent to ban someone from the Social Network platform).
   
   In essense, these perspetives represent two different approaches to try and deal with fake news on Social Media. The first persepctive, 'assigned-Authority', represent an intervention where the Network Providers (e.g. Facebook Staff) assign the task of flagging/stopping fake news to different individuals within the network. The second persepctive, 'leave-it-to-the-population', represent the idea of having the network regulate it self, leaving it to the population (its users) to detect fake news.  
-  Furthermore, Social Media might be the an ideal environment for Fake News due to its structure. A social network is characterized by a high clustering coeffecient (i.e. users are thightly connected in 'cliques' or clusters). Additionally, social media is charaterized by a community structure where links are dense within communities but sparse between them.
-  
-  This creates two different hypotheses:
-  1. The number of 'infected' nodes is predicted by the strucutre of the network (i.e. the clustering coeffecient), the number of WD, their degree of centrality, and their level of 'betweenness centrality'*.
-  2. The number of 'infected' nodes is predicted by the structure of the network (i.e. the clustering coeffecient) and the probability for detecting fake news. 
-  
+  Furthermore, social media is hypothezied to be an optimal environment for Fake News due to its structure. A social network is characterized by a high clustering coeffecient (i.e. users are thightly connected in 'cliques' or clusters). Additionally, social media is charaterized by a community structure where links are dense within communities but sparse between them.
   
   
 
+The network:
 
-Clustering coefficient = a measure of how likely it is that two connected nodes are part of the some larger, highly connected group of nodes (A probability measure, between 0-1).
+Using the NetLogo model 'Virus on a Network' as template. 
+A small world network
+Specify a number of WD as the beginning (and specify their ability)
+Calcualting the measures - number of communities, clustering coeffecient, average-path-length, etc. 
+  
 
-For the WD: levels of centrality (how powerful they are) - different ways to measure this: degree of centrality (i.e. how many connections), the likelihood of them effecting what is being echanged within the network - high degree = a hub. Closeness centrality = distance (important because distances acts as a constraint). 
-*Betweeness centratility = when agent acts as a bridge between two communities --> plays a critical role in what info is being transfered between communities - if social network is charaterized by a sparse link between communities, it might be interesting to see, if WD can do anything by 'blocking' the bridge between communities (probably not as litterature says that homogenous communities is the real enemy here).  
+  Clustering coefficient = a measure of how likely it is that two connected nodes are part of the some larger, highly connected group of nodes (A probability measure, between 0-1).
+
+
+```{r}
+library(pacman)
+p_load(rethinking,brms,brmstools,ggplot2,caret)
+
+
+#Reading in Data and cleaning it
+FN_df = read.csv("FakeNewsData3test1.csv", sep = ";")
+FN_df$ID = 1
+FN_df2 = read.csv("FakeNewsData3test2.csv", sep = ";")
+FN_df2$ID = 2
+
+dataset<-rbind(FN_df, FN_df2)
+
+# Change column names
+colnames(dataset) = c("runNumber", "nodesAmount", "outbreakSize", "numberofWD", "recovery", "tick", "turtlesAmount", "clusteringCoef", "pathLength", "naivesAmount", "spreadersAmount", "educatedAmount", "untouchedAmount", "fileID")
+
+dataset$turtlesAmount = NULL
+
+# blue ones = naives
+# red = spreaders
+# grey = educated
+# yellow = untouched
+
+# Order based on file ID so that the data from the same simulation comes together
+dataset$runNumber = as.numeric(dataset$runNumber)
+dat <- dataset[order(dataset$fileID),]
+
+```
+
+```{r}
+#PLaying around with plots - some visualizations about development of agents over time
+
+#Amount of spreaders over time when outbreak size is maximum
+temp = subset(dataset, outbreakSize == "188")
+temp$numberofWD = as.factor(temp$numberofWD)
+
+ggplot(temp,aes(tick,spreadersAmount, color = numberofWD))+
+  geom_point()+
+  ggtitle("Outbreak Size = 188 (Max)")+
+  theme_classic()
+
+#Amount of spreaders over time when outbreak size is minimum
+temp = subset(dataset, outbreakSize == "1")
+temp$numberofWD = as.factor(temp$numberofWD)
+
+ggplot(temp, aes(tick,spreadersAmount, color = numberofWD))+
+  geom_point()+
+  ggtitle("Outbreak Size = 1 (Min)")+
+  theme_classic()
+
+#Amount of spreaders over time when number of wd is minimum
+temp = subset(dataset, numberofWD == "10")
+temp$outbreakSize = as.factor(temp$outbreakSize)
+
+ggplot(temp, aes(tick,spreadersAmount, color = outbreakSize))+
+  geom_point()+
+  ggtitle("Number of WD = 10 (Min)")+
+  theme_classic()
+
+#Amount of spreaders over time when number of wd is maximum
+temp = subset(dataset, numberofWD == "50")
+temp$outbreakSize = as.factor(temp$outbreakSize)
+
+ggplot(temp, aes(tick,spreadersAmount, color = outbreakSize))+
+  geom_point()+
+  ggtitle("Number of WD = 50 (Max)")+
+  theme_classic()
+
+temp = dataset
+temp$outbreakSize = as.factor(temp$outbreakSize)
+
+#Agent development over time
+ggplot(temp, aes(tick, untouchedAmount, color = outbreakSize))+
+  geom_smooth()+
+  facet_wrap(~outbreakSize)+
+  theme_classic()
+
+ggplot(temp, aes(tick, educatedAmount, color = outbreakSize))+
+  geom_smooth()+
+  facet_wrap(~outbreakSize)+
+  theme_classic()
+
+ggplot(temp, aes(tick, spreadersAmount, color = outbreakSize))+
+  geom_smooth()+
+  facet_wrap(~outbreakSize)+
+  theme_classic()
+
+ggplot(temp, aes(tick, naivesAmount, color = outbreakSize))+
+  geom_smooth()+
+  facet_wrap(~outbreakSize)+
+  theme_classic()
+```
+
+
+```{r}
+#Bromance stuff - when we have to make models :-D
+
+dataset$ID_new = as.factor(paste(dataset$fileID, dataset$runNumber, sep = ""))
+
+m1_formula <- bf( ~ diagnosis)
+get_prior(m3_formula,Pitch.Gr.s) #Asking the model which priors it recommend
+prior = c(prior(normal(0,1), class = Intercept),
+          prior(normal(0,1),class = b, coef = diagnosis), #In this case specifying coef is actually not necessary because we only have one predictor - but often we will have more, so it's just a good idea to do so
+          prior(cauchy(0,2),class =sigma))
+
+m1 <- brm(m3_formula,
+          family = gaussian(), #We assume our likelihood function to be normally distributed
+          prior = prior, #our list of pre-defined priors
+          data = Pitch.Gr.s,
+          iter = 2000,
+          cores = 2,
+          chain = 2)
+
+summary(m1)
+plot(m1)
+
+# Scaled dataframe
+#preObj <- preProcess(dat[, c(-1,-14)], method=c("center", "scale"))
+#datscaled <- predict(preObj, dat)
+# Should not need this because:
+#These variables have zero variances: nodesAmount, recovery, turtlesAmount
+
+```
