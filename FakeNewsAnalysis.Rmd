@@ -165,7 +165,7 @@ prior = c(prior(normal(0,1), class = Intercept),
 
 m1 <- brm(m1_formula,
           family = gaussian(), #We assume our likelihood function to be normally distributed
-          prior = prior, #our list of pre-defined priors
+          prior = NULL, #our list of pre-defined priors
           data = new_df,
           iter = 2000,
           cores = 2,
