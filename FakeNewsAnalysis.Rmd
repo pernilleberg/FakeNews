@@ -67,6 +67,12 @@ dataset$turtlesAmount = NULL
 dataset$runNumber = as.numeric(dataset$runNumber)
 dat <- dataset[order(dataset$fileID),]
 
+# Scaled dataframe - in case we want to do that
+#preObj <- preProcess(dat[, c(-1,-14)], method=c("center", "scale"))
+#datscaled <- predict(preObj, dat)
+# Should not need this because:
+#These variables have zero variances: nodesAmount, recovery, turtlesAmount
+
 ```
 
 ```{r}
@@ -135,20 +141,32 @@ ggplot(temp, aes(tick, naivesAmount, color = outbreakSize))+
 
 
 ```{r}
-#Bromance stuff - when we have to make models :-D
+#Adding new columns:
+dataset$Ratio_WD = dataset$nodesAmount/dataset$numberofWD #we expect an interaction between number of nodes and number of WD - using ratio in models instead 
+dataset$ID_new = as.factor(paste(dataset$fileID, dataset$runNumber, sep = "_")) #making a new ID column which takes into account which fileID (some runNumbers are the same - can't use that as repeated measure)
 
-dataset$ID_new = as.factor(paste(dataset$fileID, dataset$runNumber, sep = ""))
+library(dplyr)
+df <- arrange(dataset, ID_new)
 
-m1_formula <- bf( ~ diagnosis)
-get_prior(m3_formula,Pitch.Gr.s) #Asking the model which priors it recommend
+#Summarize by so we know the ticks it took to complete each sim - our outcome
+maxTick = group_by(df,ID_new) %>%
+  summarize(maxTick = max(tick))
+new_df=merge(df,maxTick, all = T)
+
+m1_formula <- bf(maxTick ~ outbreakSize + Ratio_WD + (1|ID_new)) #The last bit is how you add repeated measures
+#We need to consider: Random effects?
+
+get_prior(m1_formula,new_df) #Asking the model which priors it recommend
+
 prior = c(prior(normal(0,1), class = Intercept),
-          prior(normal(0,1),class = b, coef = diagnosis), #In this case specifying coef is actually not necessary because we only have one predictor - but often we will have more, so it's just a good idea to do so
-          prior(cauchy(0,2),class =sigma))
+          prior(normal(0,1), class = b, coef = outbreakSize),
+          prior(normal(0,1), class = b, coef = Ratio_WD),
+          prior(cauchy(0,2), class = sigma))
 
-m1 <- brm(m3_formula,
+m1 <- brm(m1_formula,
           family = gaussian(), #We assume our likelihood function to be normally distributed
           prior = prior, #our list of pre-defined priors
-          data = Pitch.Gr.s,
+          data = new_df,
           iter = 2000,
           cores = 2,
           chain = 2)
@@ -156,10 +174,26 @@ m1 <- brm(m3_formula,
 summary(m1)
 plot(m1)
 
-# Scaled dataframe
-#preObj <- preProcess(dat[, c(-1,-14)], method=c("center", "scale"))
-#datscaled <- predict(preObj, dat)
-# Should not need this because:
-#These variables have zero variances: nodesAmount, recovery, turtlesAmount
+m2_formula <- bf(maxTick ~ clusteringCoef + pathLength + outbreakSize + Ratio_WD + (1|ID_new)) #The last bit is how you add repeated measures
+#We need to consider: Random effects?
+#Remember: when comparing the models, this model should be punished because it's adding all them parameters 
 
+
+get_prior(m2_formula,new_df) #Asking the model which priors it recommend
+
+prior = c(prior(normal(0,1), class = Intercept),
+          prior(normal(0,1), class = b, coef = outbreakSize),
+          prior(normal(0,1), class = b, coef = Ratio_WD),
+          prior(cauchy(0,2), class = sigma))
+
+m2 <- brm(m2_formula,
+          family = gaussian(), #We assume our likelihood function to be normally distributed
+          prior = prior, #our list of pre-defined priors
+          data = new_df,
+          iter = 2000,
+          cores = 2,
+          chain = 2)
+
+summary(m2)
+plot(m2)
 ```
