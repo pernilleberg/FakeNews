@@ -156,16 +156,17 @@ new_df=merge(df,maxTick, all = T)
 m1_formula <- bf(maxTick ~ outbreakSize + Ratio_WD + (1|ID_new)) #The last bit is how you add repeated measures
 #We need to consider: Random effects?
 
+
 get_prior(m1_formula,new_df) #Asking the model which priors it recommend
 
-prior = c(prior(normal(0,1), class = Intercept),
-          prior(normal(0,1), class = b, coef = outbreakSize),
-          prior(normal(0,1), class = b, coef = Ratio_WD),
-          prior(cauchy(0,2), class = sigma))
+prior = c(prior(student_t(3,10,10), class = Intercept),
+          prior(normal(0,1), class = b, coef = outbreakSize), #what to do when categorical?
+          prior(normal(0,1), class = b, coef = Ratio_WD), #what do to when categorical?
+          prior(student_t(3,0,10), class = sigma))
 
 m1 <- brm(m1_formula,
-          family = gaussian(), #We assume our likelihood function to be normally distributed
-          prior = NULL, #our list of pre-defined priors
+          family = student_t(), #We assume our likelihood function to be long-tailed (left skewed)
+          prior = prior, #our list of pre-defined priors
           data = new_df,
           iter = 2000,
           cores = 2,
@@ -174,7 +175,7 @@ m1 <- brm(m1_formula,
 summary(m1)
 plot(m1)
 
-m2_formula <- bf(maxTick ~ clusteringCoef + pathLength + outbreakSize + Ratio_WD + (1|ID_new)) #The last bit is how you add repeated measures
+m2_formula <- bf(maxTick ~ clusteringCoef + pathLength + outbreakSize + Ratio_WD + (1|ID_new)) #The last bit is how you add repeated measures?
 #We need to consider: Random effects?
 #Remember: when comparing the models, this model should be punished because it's adding all them parameters 
 
