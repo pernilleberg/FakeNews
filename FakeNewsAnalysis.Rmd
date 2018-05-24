@@ -10,35 +10,12 @@ editor_options:
 Analyzing the spread of Fake News in a Social Network.
 
 Outline:
-  1. Short description of main questions and hypotheses 
-  2. Short description of network used to simulate the spread - it's structure, which parameters etc.
-  3. Data cleaning (Probably necessary)
-  4. Models used for analysis: Bayesian (brms or map2stan?)
-  5. Assessing model quality
-  6. Results (Pretty plots and some estimates)
+  1. Data cleaning 
+  2. Plots/Visualizations
+  3. Models used for analysis (brms)
+  4. Plotting prior and posterior distributions
+  5. Assessing model quality 
   
-
-Main Questions and Hyptheses 
-
-This paper set out to investigate how different network characteristics influence the spread of Fake News in a Social Network. Mainly, we are interested in which parameters must be present (and to what extent) to limit the spread of Fake News stories in a thightly interconnected network
-
-  We will explore this question from two different persepectives: 1) an 'assigned-Authority' perspective, where the modulators/modifiers (named 'WatchDogs') are randomly distributed throughtout the network, and have a fixed probability of detecting fake news, and 2) a 'leave-it-to-the-population' perspective, where all agents/nodes within the network has a probability of detecting fake news, and afterwards punish the agent from which they received the Fake News by isolating it from the network (equavilent to ban someone from the Social Network platform).
-  
-  In essense, these perspetives represent two different approaches to try and deal with fake news on Social Media. The first persepctive, 'assigned-Authority', represent an intervention where the Network Providers (e.g. Facebook Staff) assign the task of flagging/stopping fake news to different individuals within the network. The second persepctive, 'leave-it-to-the-population', represent the idea of having the network regulate it self, leaving it to the population (its users) to detect fake news.  
-  Furthermore, social media is hypothezied to be an optimal environment for Fake News due to its structure. A social network is characterized by a high clustering coeffecient (i.e. users are thightly connected in 'cliques' or clusters). Additionally, social media is charaterized by a community structure where links are dense within communities but sparse between them.
-  
-  
-
-The network:
-
-Using the NetLogo model 'Virus on a Network' as template. 
-A small world network
-Specify a number of WD as the beginning (and specify their ability)
-Calcualting the measures - number of communities, clustering coeffecient, average-path-length, etc. 
-  
-
-  Clustering coefficient = a measure of how likely it is that two connected nodes are part of the some larger, highly connected group of nodes (A probability measure, between 0-1).
-
 
 ```{r}
 library(pacman)
@@ -136,19 +113,17 @@ ggplot(temp, aes(tick, naivesAmount, color = outbreakSize))+
 
 ```{r}
 #Adding new columns:
-dataset$Ratio_WD = dataset$nodesAmount/dataset$numberofWD #we expect an interaction between number of nodes and number of WD - using ratio in models instead 
-dataset$ID_new = as.factor(paste(dataset$fileID, dataset$runNumber, sep = "_")) #making a new ID column which takes into account which fileID (some runNumbers are the same - can't use that as repeated measure)
+dataset$Ratio_WD = dataset$numberofWD/dataset$nodesAmount #we expect an interaction between number of nodes and number of WD - using ratio in models instead 
+dataset$ID_new = as.factor(paste(dataset$fileID, dataset$runNumber, sep = "_")) #making a new ID column which takes into account which fileID (some runNumbers are the same)
 
 df <- arrange(dataset, ID_new)
 
-#Summarize by so we know the ticks it took to complete each sim - our outcome
+#Summarize by maximum number of ticks so we know the ticks it took to complete each sim - our outcome
 maxTick = group_by(df,ID_new) %>%
   summarize(maxTick = max(tick))
 new_df=merge(df,maxTick, all = T)
 
-new_df$log_maxTick = log(new_df$maxTick)
-
-rescalelist = c("outbreakSize","Ratio_WD", "clusteringCoef","pathLength","log_maxTick")
+rescalelist = c("outbreakSize","Ratio_WD", "clusteringCoef","pathLength")
 new_df.s = new_df[, colnames(new_df) %in% rescalelist] %>% 
   lapply(.,function(x) scale(x,center= mean(x,na.rm = T), scale = sd(x, na.rm = T)))%>% 
   cbind(.,new_df[,! colnames(new_df) %in% rescalelist]) 
@@ -167,25 +142,24 @@ m1_formula <- bf(maxTick ~ outbreakSize + Ratio_WD)
 
 #get_prior(m1_formula,new_df) #Asking the model which priors it recommend
 
-prior = c(prior(normal(9.2,4.8), class = Intercept),
+prior = c(prior(normal(log(9.2),log(4.8)), class = Intercept),
           prior(normal(0,0.5), class = b, coef = outbreakSize), 
           prior(normal(0,0.5), class = b, coef = Ratio_WD)) 
 
-#m1.1_formula <- bf(maxTick ~ outbreakSize + Ratio_WD + (outbreakSize + Ratio_WD|ID_new))
-        
 
 m1 <- brm(m1_formula,
           family = poisson(link = "log"), #We assume our likelihood function to be poisson
           prior = prior, #our list of pre-defined priors
           data = new_df.s2,
-          warmup = 500,
-          iter = 1000,
+          warmup = 4000,
+          iter = 10000,
           cores = 3,
-          chain = 2)
+          chain = 3)
 
 summary(m1)
 plot(m1)
 
+#m1.1_formula <- bf(maxTick ~ outbreakSize + Ratio_WD + (outbreakSize + Ratio_WD|ID_new))
 #m1.1 <- brm(m1.1_formula,
           #family = poisson(link = "log"), #We assume our likelihood function to be poisson
           #prior = prior, #our list of pre-defined priors
@@ -198,56 +172,93 @@ plot(m1)
 #summary(m1.1)
 #plot(m1.1)
 
-#Structure model
-m2_formula <- bf(maxTick ~ outbreakSize + clusteringCoef*pathLength) 
+#Structure model - model 3
+m3_formula <- bf(maxTick ~ outbreakSize + clusteringCoef*pathLength) 
 
 
-get_prior(m2_formula,new_df.s2)
+get_prior(m3_formula,new_df.s2)
 
-prior_str = c(prior(normal(9.2,4.8), class = Intercept),
+prior_str = c(prior(normal(log(9.2),log(4.8)), class = Intercept),
               prior(normal(0,0.5), class = b, coef = outbreakSize),
               prior(normal(0,0.5), class = b, coef = clusteringCoef:pathLength))
 
-m2 <- brm(m2_formula,
+m3 <- brm(m3_formula,
           family = poisson(link = "log"), 
           prior = prior_str, 
           data = new_df.s2,
-          warmup = 500,
-          iter = 1000,
+          warmup = 4000,
+          iter = 10000,
           cores = 3,
-          chain = 2)
+          chain = 3)
 
-summary(m2)
-plot(m2)
+summary(m3)
+plot(m3)
 ```
 
 
 ```{r}
-#Model comparisons, priors and posteriors
+#Priors and posteriors - plots
 
 #Plot priors
 x <- seq(-2,2, length=1e5)
-y <- dnorm(x, 0, 0.5) #original
-y.s <- dnorm(x, 0, 0.1) #sceptical
-y.m <- dnorm(x, -0.54, 0.23) #meta
-prior_df <- data.frame(x = rep(x,3), y = c(y, y.s, y.m), prior = c(rep("original", length(y)),
-                                                                   rep("sceptical", length(y.s)),
-                                                                   rep("meta", length(y.m))
-                                                                   ))
-ggplot(prior_df, aes(x = x, y = y, color = prior)) + geom_line() 
+y <- dnorm(x, 0, 0.5)
+y.I <- dnorm(x, log(9.2), log(4.8))
 
-#plot posterior
-post_samples <- c(posterior_samples(m3)$b_diagnosis1, posterior_samples(m3.c)$b_diagnosis1, posterior_samples(m3.m)$b_diagnosis1) #how do I extract more than a 1000 per
-post_df <- data.frame(post_samples = post_samples, model = c(rep("original", 1000),
-                                                                   rep("sceptical", 1000),
-                                                                   rep("meta", 1000)
-                                                                   ))
-ggplot(post_df, aes(x = post_samples, color = model)) + geom_density(adjust = 1) 
+prior_df <- data.frame(x = rep(x,1), y = c(y), prior = c(rep("Beta Prior", length(y))))
+ggplot(prior_df, aes(x = x, y = y, color = prior)) + geom_line() + ggtitle("Beta Prior")
 
-  #compare models:
-waic <- brms::WAIC(m3, m3.c, m3.m)
-weights <- brms::model_weights(m3, m3.c, m3.m, weights = "waic")
+x <- seq(0,4, length = 1e5)
+prior_df <- data.frame(x = rep(x,1), y = c(y.I), prior = c(rep("Intercept Prior", length(y.I))))
+ggplot(prior_df, aes(x = x, y = y, color = prior)) + geom_line() + ggtitle("Intercept Prior")
 
+plot(y.I)
+
+#Plot predictive priors
+
+#plot posterior distributions 
+  #Model 1
+post_samples <- c(posterior_samples(m1)$b_Intercept)
+post_df <- data.frame(post_samples = post_samples, parameter = c(rep("Intercept", 1000)))
+ggplot(post_df, aes(x = post_samples, color = parameter)) + geom_density(adjust = 1) + labs(title = "Model 1: Posterior Distributions - Intercept", x = "Posterior Samples")
+
+post_samples <- c(posterior_samples(m1)$b_outbreakSize)
+post_df <- data.frame(post_samples = post_samples, parameter = c(rep("Outbreak Size", 1000)))
+ggplot(post_df, aes(x = post_samples, color = parameter)) + geom_density(adjust = 1) + labs(title = "Model 1: Posterior Distributions - Outbreak Size", x = "Posterior Samples")
+
+post_samples <- c(posterior_samples(m1)$b_Ratio_WD)
+post_df <- data.frame(post_samples = post_samples, parameter = c(rep("Ratio of Watch Dogs", 1000)))
+ggplot(post_df, aes(x = post_samples, color = parameter)) + geom_density(adjust = 1) + labs(title = "Model 1: Posterior Distributions - Ratio of Watch Dogs", x = "Posterior Samples")
+
+                      
+  #Model 3
+post_samples <- c(posterior_samples(m2)$b_Intercept)
+post_df <- data.frame(post_samples = post_samples, parameter = c(rep("Intercept", 1000)))
+ggplot(post_df, aes(x = post_samples, color = parameter)) + geom_density(adjust = 1) + labs(title = "Model 3: Posterior Distribution - Intercept", x = "Posterior Samples")
+
+
+post_samples <- c(posterior_samples(m3)$b_outbreakSize)
+post_df <- data.frame(post_samples = post_samples, parameter = c(rep("OutbreakSize", 1000)))
+ggplot(post_df, aes(x = post_samples, color = parameter)) + geom_density(adjust = 1) + labs(title = "Model 3: Posterior Distribution - Outbreak Size", x = "Posterior Samples")
+
+post_samples <- c(posterior_samples(m3)$b_clusteringCoef)
+post_df <- data.frame(post_samples = post_samples, parameter = c(rep("Clustering Coefficient", 1000)))
+ggplot(post_df, aes(x = post_samples, color = parameter)) + geom_density(adjust = 1) + labs(title = "Model 3: Posterior Distribution - Clustering Coefficient", x = "Posterior Samples")
+
+post_samples <- c(posterior_samples(m3)$b_pathLength)
+post_df <- data.frame(post_samples = post_samples, parameter = c(rep("Average Path Length", 1000)))
+ggplot(post_df, aes(x = post_samples, color = parameter)) + geom_density(adjust = 1) + labs(title = "Model 3: Posterior Distribution - Average Path Length", x = "Posterior Samples")
+
+  #compare models with infomation criterion and weights:
+waic <- brms::WAIC(m1, m3)
+weights <- brms::model_weights(m1, m3, weights = "waic")
+
+  #Predictive posterior
+pp_check(m1,nsamples = 200)
+pp_check(m3,nsamples = 200)
+
+  #Making sense of estimates - posterior distribtions for estimates
+stanplot(m1)
+stanplot(m3)
 
 
 ```
