@@ -176,10 +176,12 @@ plot(m1)
 m3_formula <- bf(maxTick ~ outbreakSize + clusteringCoef*pathLength) 
 
 
-get_prior(m3_formula,new_df.s2)
+#get_prior(m3_formula,new_df.s2)
 
 prior_str = c(prior(normal(log(9.2),log(4.8)), class = Intercept),
               prior(normal(0,0.5), class = b, coef = outbreakSize),
+              prior(normal(0,0.5), class = b, coef = clusteringCoef),
+              prior(normal(0,0.5), class = b, coef = pathLength),
               prior(normal(0,0.5), class = b, coef = clusteringCoef:pathLength))
 
 m3 <- brm(m3_formula,
@@ -231,7 +233,7 @@ ggplot(post_df, aes(x = post_samples, color = parameter)) + geom_density(adjust 
 
                       
   #Model 3
-post_samples <- c(posterior_samples(m2)$b_Intercept)
+post_samples <- c(posterior_samples(m3)$b_Intercept)
 post_df <- data.frame(post_samples = post_samples, parameter = c(rep("Intercept", 1000)))
 ggplot(post_df, aes(x = post_samples, color = parameter)) + geom_density(adjust = 1) + labs(title = "Model 3: Posterior Distribution - Intercept", x = "Posterior Samples")
 
@@ -250,7 +252,9 @@ ggplot(post_df, aes(x = post_samples, color = parameter)) + geom_density(adjust 
 
   #compare models with infomation criterion and weights:
 waic <- brms::WAIC(m1, m3)
+waic
 weights <- brms::model_weights(m1, m3, weights = "waic")
+round(weights,digits = 4)
 
   #Predictive posterior
 pp_check(m1,nsamples = 200)
